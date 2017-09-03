@@ -13,28 +13,67 @@ import android.nfc.tech.NdefFormatable
 import java.io.IOException
 
 /**
- * Created by dvtmpjwelcome on 2017/07/08.
+ * Created by PJ Welcome on 2017/07/08 in NFCApp.
  */
 object NFCUtil {
 
-    fun createNFCMessage(payload: String, intent: Intent?) : Boolean {
+    fun createNFCMessage(payload: String, intent: Intent?): Boolean {
 
         val pathPrefix = "peterjohnwelcome.com:nfcapp"
         val nfcRecord = NdefRecord(NdefRecord.TNF_EXTERNAL_TYPE, pathPrefix.toByteArray(), ByteArray(0), payload.toByteArray())
         val nfcMessage = NdefMessage(arrayOf(nfcRecord))
         intent?.let {
             val tag = it.getParcelableExtra<Tag>(NfcAdapter.EXTRA_TAG)
-            return  writeMessageToTag(nfcMessage, tag)
+            return writeMessageToTag(nfcMessage, tag)
         }
         return false
     }
 
-    fun disableNFCInForeground(nfcAdapter: NfcAdapter,activity: Activity) {
+    fun retrieveNFCMessage(intent: Intent?): String {
+        intent?.let {
+            if (NfcAdapter.ACTION_NDEF_DISCOVERED == intent.action) {
+                val nDefMessages = getNDefMessages(intent)
+                nDefMessages[0].records?.let {
+                    it.forEach {
+                        it?.payload.let {
+                            it?.let {
+                                return String(it)
+
+                            }
+                        }
+                    }
+                }
+
+            } else {
+                return "Touch NFC tag to read data"
+            }
+        }
+        return "Touch NFC tag to read data"
+    }
+
+
+    private fun getNDefMessages(intent: Intent): Array<NdefMessage> {
+
+        val rawMessage = intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES)
+        rawMessage?.let {
+            return rawMessage.map {
+                it as NdefMessage
+            }.toTypedArray()
+        }
+        // Unknown tag type
+        val empty = byteArrayOf()
+        val record = NdefRecord(NdefRecord.TNF_UNKNOWN, empty, empty, empty)
+        val msg = NdefMessage(arrayOf(record))
+        return arrayOf(msg)
+    }
+
+    fun disableNFCInForeground(nfcAdapter: NfcAdapter, activity: Activity) {
         nfcAdapter.disableForegroundDispatch(activity)
     }
-    fun <T>enableNFCInForeground(nfcAdapter: NfcAdapter, activity: Activity, classType : Class<T>) {
+
+    fun <T> enableNFCInForeground(nfcAdapter: NfcAdapter, activity: Activity, classType: Class<T>) {
         val pendingIntent = PendingIntent.getActivity(activity, 0,
-                Intent(activity,classType).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP), 0)
+                Intent(activity, classType).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP), 0)
         val nfcIntentFilter = IntentFilter(NfcAdapter.ACTION_NDEF_DISCOVERED)
         val filters = arrayOf(nfcIntentFilter)
 
@@ -42,6 +81,7 @@ object NFCUtil {
 
         nfcAdapter.enableForegroundDispatch(activity, pendingIntent, filters, TechLists)
     }
+
 
     private fun writeMessageToTag(nfcMessage: NdefMessage, tag: Tag?): Boolean {
 
